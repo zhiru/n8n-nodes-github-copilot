@@ -60,6 +60,12 @@ export class DynamicModelsManager {
    * Generate a hash for the token (for cache key)
    */
   private static hashToken(token: string): string {
+    // Validate token
+    if (!token || typeof token !== 'string' || token.length === 0) {
+      console.warn('⚠️ Invalid token provided to hashToken, using fallback hash');
+      return 'models_default';
+    }
+    
     // Simple hash for cache key (not cryptographic)
     let hash = 0;
     for (let i = 0; i < token.length; i++) {

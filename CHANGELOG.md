@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.2] - 2026-02-10 🛡️ Token Validation Fixes
+
+### Fixed
+- **Critical**: Fixed `Cannot read properties of undefined (reading 'length')` error in DynamicModelsManager
+- **GitHubCopilotOpenAI Node** - Proper token retrieval from credentials:
+  - Now correctly accesses both `token` and `oauthToken` fields
+  - Added validation before attempting to use token for vision detection
+  - Fallback to static model list when token is unavailable
+- **DynamicModelsManager** - Added robust token validation:
+  - Validates token exists and is a non-empty string before hashing
+  - Prevents crashes when undefined/null tokens are passed
+  - Returns fallback hash for invalid tokens
+
+### Improved
+- Better error handling for credential access
+- More defensive coding in token-dependent operations
+
 ## [4.4.1] - 2026-02-10 🔄 Auto JSON Content Normalization
 
 ### Fixed

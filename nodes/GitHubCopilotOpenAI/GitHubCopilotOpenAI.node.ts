@@ -362,18 +362,18 @@ export class GitHubCopilotOpenAI implements INodeType {
 				if (hasVisionContent) {
 					// Get credentials for dynamic model lookup
 					const credentials = await this.getCredentials('githubCopilotApi');
-					const oauthToken = credentials.oauthToken as string;
+				// Try both token fields (token for CLI token, oauthToken for OAuth token)
+				const oauthToken = (credentials.oauthToken || credentials.token) as string;
 
-					// Check vision support: first try dynamic API cache, then static list
-					let supportsVision: boolean | null = DynamicModelsManager.modelSupportsVision(oauthToken, copilotModel);
-					
-					if (supportsVision === null) {
-						// Fallback to static model list
-						const modelInfo = GitHubCopilotModelsManager.getModelByValue(copilotModel);
-						supportsVision = !!(modelInfo?.capabilities?.vision || modelInfo?.capabilities?.multimodal);
-						console.log(`👁️ Vision check for model ${copilotModel}: using static list, supportsVision=${supportsVision}`);
-					} else {
-						console.log(`👁️ Vision check for model ${copilotModel}: using API cache, supportsVision=${supportsVision}`);
+				// Check vision support: first try dynamic API cache, then static list
+				// Only use dynamic lookup if we have a valid token
+				let supportsVision: boolean | null = oauthToken 
+					? DynamicModelsManager.modelSupportsVision(oauthToken, copilotModel)
+					: null;
+				
+				if (supportsVision === null) {
+					// Fallback to static model list
+					const modelInfo = GitHubCopilotModelsManager.getModelByValue(copilotModel);
 					}
 					
 					if (!supportsVision) {
