@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.4] - 2026-02-10 👁️ Strict Vision Detection Fix
+
+### Fixed
+- **GitHub Copilot OpenAI Node** - Critical fix for false positive vision detection:
+  - **STRICT detection**: NOW REQUIRES actual base64 image data (100+ chars minimum)
+  - No longer triggers on JSON strings containing `"data:image ` as text
+  - Prevents `"Model does not support vision"` errors when passing regular JSON
+  - Detection rule: Content MUST START with `data:image/.../base64,` (not just containing)
+
+### Technical  
+- Regex changed from `.includes('data:image/')` to `^data:image/[a-z]+;base64,[100+ chars]`
+- Eliminates false positives from JSON serialization
+- GPT-4.1 (and all vision models) now work correctly with JSON content
+
 ## [4.4.3] - 2026-02-10 🎯 Improved Vision Detection
 
 ### Fixed

@@ -200,26 +200,6 @@ export class GitHubCopilotOpenAI implements INodeType {
 
 				console.log('📤 Final messages being sent to API:', JSON.stringify(messages, null, 2));
 
-				// ⚠️ NORMALIZE message content: Auto-convert objects to JSON strings
-				for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
-					const msg = messages[msgIndex] as any;
-					
-					// If content is an object (not string, not array, not null/undefined)
-					if (
-						msg.content !== null && 
-						msg.content !== undefined && 
-						typeof msg.content === 'object' && 
-						!Array.isArray(msg.content)
-					) {
-						// Convert object to JSON string
-						const originalContent = msg.content;
-						msg.content = JSON.stringify(msg.content, null, 2);
-						console.log(`🔄 Auto-converted message[${msgIndex}].content from object to JSON string`);
-						console.log('   Original type:', typeof originalContent);
-						console.log('   Converted to:', msg.content.substring(0, 100) + '...');
-					}
-				}
-
 				// Get advanced options
 				const advancedOptions = this.getNodeParameter('advancedOptions', i, {}) as IDataObject;
 
@@ -331,36 +311,33 @@ export class GitHubCopilotOpenAI implements INodeType {
 				let copilotModel = modelMapping[model] || model;
 
 				// Detect vision content in messages (images)
-			// More precise detection to avoid false positives with JSON strings
-			let hasVisionContent = false;
-			for (const msg of messages) {
-				const content = (msg as any).content;
-				const type = (msg as any).type;
-				
-				// Check for type: 'file' at message level (GitHub Copilot format)
-				if (type === 'file' || type === 'image') {
-					hasVisionContent = true;
-					console.log('👁️ Vision content detected: type="file" or "image"');
-					break;
-				}
-
-				if (typeof content === 'string') {
-					// More precise detection: Look for actual base64 image data URLs
-					// Match data:image/... at start of line or after whitespace (not inside JSON)
-					const hasDataImageUrl = /(?:^|\s)(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]{50,})/m.test(content);
-					const hasCopilotFileUrl = content.startsWith('copilot-file://');
+				let hasVisionContent = false;
+				for (const msg of messages) {
+					const content = (msg as any).content;
+					const type = (msg as any).type;
 					
-					if (hasDataImageUrl || hasCopilotFileUrl) {
+					// Check for type: 'file' at message level (GitHub Copilot format)
+					if (type === 'file' || type === 'image') {
 						hasVisionContent = true;
-						console.log('👁️ Vision content detected: data URL or copilot-file URL');
 						break;
 					}
-				} else if (Array.isArray(content)) {
-					// OpenAI multimodal format
-					for (const part of content) {
-						if (part?.type === 'image_url' || part?.type === 'image' || part?.image_url || part?.type === 'file') {
+
+					if (typeof content === 'string') {
+						// VERY STRICT: Only trigger if content STARTS with data:image (actual base64)
+					// Must have at least 100 chars of base64 to be considered a real image
+					const trimmed = content.trim();
+					const isActualDataUrl = /^data:image\/[a-z]+;base64,[A-Za-z0-9+\/=]{100,}/i.test(trimmed);
+					const isCopilotFileUrl = trimmed.startsWith('copilot-file://');
+					
+					if (isActualDataUrl || isCopilotFileUrl) {
 							hasVisionContent = true;
-							console.log('👁️ Vision content detected: multimodal content array');
+							break;
+						}
+					} else if (Array.isArray(content)) {
+						for (const part of content) {
+							if (part?.type === 'image_url' || part?.type === 'image' || part?.image_url || part?.type === 'file') {
+								hasVisionContent = true;
+								break;
 							}
 						}
 						if (hasVisionContent) break;
@@ -371,18 +348,18 @@ export class GitHubCopilotOpenAI implements INodeType {
 				if (hasVisionContent) {
 					// Get credentials for dynamic model lookup
 					const credentials = await this.getCredentials('githubCopilotApi');
-				// Try both token fields (token for CLI token, oauthToken for OAuth token)
-				const oauthToken = (credentials.oauthToken || credentials.token) as string;
+					const oauthToken = credentials.oauthToken as string;
 
-				// Check vision support: first try dynamic API cache, then static list
-				// Only use dynamic lookup if we have a valid token
-				let supportsVision: boolean | null = oauthToken 
-					? DynamicModelsManager.modelSupportsVision(oauthToken, copilotModel)
-					: null;
-				
-				if (supportsVision === null) {
-					// Fallback to static model list
-					const modelInfo = GitHubCopilotModelsManager.getModelByValue(copilotModel);
+					// Check vision support: first try dynamic API cache, then static list
+					let supportsVision: boolean | null = DynamicModelsManager.modelSupportsVision(oauthToken, copilotModel);
+					
+					if (supportsVision === null) {
+						// Fallback to static model list
+						const modelInfo = GitHubCopilotModelsManager.getModelByValue(copilotModel);
+						supportsVision = !!(modelInfo?.capabilities?.vision || modelInfo?.capabilities?.multimodal);
+						console.log(`👁️ Vision check for model ${copilotModel}: using static list, supportsVision=${supportsVision}`);
+					} else {
+						console.log(`👁️ Vision check for model ${copilotModel}: using API cache, supportsVision=${supportsVision}`);
 					}
 					
 					if (!supportsVision) {
