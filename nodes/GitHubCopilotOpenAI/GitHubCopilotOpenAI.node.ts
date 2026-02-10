@@ -331,27 +331,36 @@ export class GitHubCopilotOpenAI implements INodeType {
 				let copilotModel = modelMapping[model] || model;
 
 				// Detect vision content in messages (images)
-				let hasVisionContent = false;
-				for (const msg of messages) {
-					const content = (msg as any).content;
-					const type = (msg as any).type;
+			// More precise detection to avoid false positives with JSON strings
+			let hasVisionContent = false;
+			for (const msg of messages) {
+				const content = (msg as any).content;
+				const type = (msg as any).type;
+				
+				// Check for type: 'file' at message level (GitHub Copilot format)
+				if (type === 'file' || type === 'image') {
+					hasVisionContent = true;
+					console.log('👁️ Vision content detected: type="file" or "image"');
+					break;
+				}
+
+				if (typeof content === 'string') {
+					// More precise detection: Look for actual base64 image data URLs
+					// Match data:image/... at start of line or after whitespace (not inside JSON)
+					const hasDataImageUrl = /(?:^|\s)(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]{50,})/m.test(content);
+					const hasCopilotFileUrl = content.startsWith('copilot-file://');
 					
-					// Check for type: 'file' at message level (GitHub Copilot format)
-					if (type === 'file' || type === 'image') {
+					if (hasDataImageUrl || hasCopilotFileUrl) {
 						hasVisionContent = true;
+						console.log('👁️ Vision content detected: data URL or copilot-file URL');
 						break;
 					}
-
-					if (typeof content === 'string') {
-						if (content.includes('data:image/') || content.match(/\[.*image.*\]/i) || content.startsWith('copilot-file://')) {
+				} else if (Array.isArray(content)) {
+					// OpenAI multimodal format
+					for (const part of content) {
+						if (part?.type === 'image_url' || part?.type === 'image' || part?.image_url || part?.type === 'file') {
 							hasVisionContent = true;
-							break;
-						}
-					} else if (Array.isArray(content)) {
-						for (const part of content) {
-							if (part?.type === 'image_url' || part?.type === 'image' || part?.image_url || part?.type === 'file') {
-								hasVisionContent = true;
-								break;
+							console.log('👁️ Vision content detected: multimodal content array');
 							}
 						}
 						if (hasVisionContent) break;

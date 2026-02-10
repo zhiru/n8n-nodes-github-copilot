@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.3] - 2026-02-10 🎯 Improved Vision Detection
+
+### Fixed
+- **GitHubCopilotOpenAI Node** - More precise vision content detection:
+  - Eliminates false positives when JSON strings contain words like "image" or "data:image"
+  - Uses regex pattern to detect actual base64 image data URLs (`data:image/...;base64,...`)
+  - Requires minimum 50 characters of base64 data to avoid false matches
+  - Prevents unnecessary vision model requirements for plain text/JSON content
+
+### Improved
+- Added detailed logging for vision detection triggers
+- More accurate multimodal content identification
+- Better handling of JSON serialized data vs actual image content
+
 ## [4.4.2] - 2026-02-10 🛡️ Token Validation Fixes
 
 ### Fixed
