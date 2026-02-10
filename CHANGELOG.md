@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.5] - 2026-02-10 🔄 JSON Restored & Vision Fixed
+
+### Fixed
+- **GitHub Copilot OpenAI Node** - Restored automatic JSON normalization:
+  - Re-implemented `JSON.stringify` logic for object content
+  - Fixes `400 Bad Request` regression when passing JSON objects
+  - Works in conjunction with Strict Vision Detection (v4.4.4)
+
 ## [4.4.4] - 2026-02-10 👁️ Strict Vision Detection Fix
 
 ### Fixed

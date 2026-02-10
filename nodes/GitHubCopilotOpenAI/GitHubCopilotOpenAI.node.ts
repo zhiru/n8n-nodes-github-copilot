@@ -200,6 +200,25 @@ export class GitHubCopilotOpenAI implements INodeType {
 
 				console.log('📤 Final messages being sent to API:', JSON.stringify(messages, null, 2));
 
+				// ⚠️ NORMALIZE message content: Auto-convert objects to JSON strings
+				for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
+					const msg = messages[msgIndex] as any;
+					
+					// If content is an object (not string, not array, not null/undefined)
+					if (
+						msg.content !== null && 
+						msg.content !== undefined && 
+						typeof msg.content === 'object' && 
+						!Array.isArray(msg.content)
+					) {
+						// Convert object to JSON string
+						const originalContent = msg.content;
+						msg.content = JSON.stringify(msg.content, null, 2);
+						console.log(`🔄 Auto-converted message[${msgIndex}].content from object to JSON string`);
+						console.log('   Original type:', typeof originalContent);
+					}
+				}
+
 				// Get advanced options
 				const advancedOptions = this.getNodeParameter('advancedOptions', i, {}) as IDataObject;
 

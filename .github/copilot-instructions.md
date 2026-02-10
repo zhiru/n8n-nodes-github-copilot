@@ -1,5 +1,5 @@
 # Copilot Instructions - n8n GitHub Copilot Nodes
-* **Version**: 202601220530
+* **Version**: 202602101145
 * **Description**: This file provides guidelines and instructions for developing n8n GitHub Copilot nodes.
 * **Repository**: https://github.com/sufficit/n8n-nodes-copilot
 * **VS Code Copilot Chat Repository**: https://github.com/microsoft/vscode-copilot-chat
@@ -69,6 +69,20 @@ if (!token.startsWith('gho_')) {
     throw new Error('Token must be a GitHub Copilot token (format: gho_*)');
 }
 ```
+
+### 📦 **NPM Publishing Token**
+The NPM token for automatic publishing is stored in:
+```
+./.npm.token
+```
+
+**Usage Rule:**
+* ✅ **CHECK**: Always check if `./.npm.token` exists before asking for authentication
+* ✅ **USE**: If exists, use it to configure npm and publish automatically
+* **PowerShell Command**:
+  ```powershell
+  $token = (Get-Content .\.npm.token -Raw).Trim(); $env:NPM_TOKEN=$token; npm config set //registry.npmjs.org/:_authToken $env:NPM_TOKEN; npm publish
+  ```
 
 ### 🧪 **Test Scripts**
 * All test scripts should point to `./.token`
