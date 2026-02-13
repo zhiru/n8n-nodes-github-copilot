@@ -105,6 +105,27 @@ export const nodeProperties: INodeProperties[] = [
 						default: '',
 						placeholder: 'Enter message content...',
 						description: 'The content of the message',
+						displayOptions: {
+							show: {
+								type: ['text', 'file'],
+							},
+						},
+					},
+					{
+						displayName: 'Caption',
+						name: 'caption',
+						type: 'string',
+						typeOptions: {
+							rows: 2,
+						},
+						default: '',
+						placeholder: 'Optional prompt for the image...',
+						description: 'Text to accompany the image (optional)',
+						displayOptions: {
+							show: {
+								type: ['file_binary'],
+							},
+						},
 					},
 					{
 						displayName: 'Type',
@@ -117,13 +138,31 @@ export const nodeProperties: INodeProperties[] = [
 								description: 'Regular text message',
 							},
 							{
-								name: 'File',
+								name: 'File (URL / Base64)',
 								value: 'file',
-								description: 'File attachment (use content as data URL or base64)',
+								description: 'File attachment using URL or Base64 string',
+							},
+							{
+								name: 'File (Binary)',
+								value: 'file_binary',
+								description: 'File attachment from binary input',
 							},
 						],
 						default: 'text',
-						description: 'The type of message content (optional)',
+						description: 'The type of message content',
+					},
+					{
+						displayName: 'Input Binary Field',
+						name: 'binaryPropertyName',
+						type: 'string',
+						default: 'data',
+						required: true,
+						displayOptions: {
+							show: {
+								type: ['file_binary'],
+							},
+						},
+						description: 'The name of the binary property that contains the file to upload',
 					},
 				],
 			},

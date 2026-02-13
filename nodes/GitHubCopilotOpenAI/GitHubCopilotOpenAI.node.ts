@@ -10,7 +10,7 @@ import {
 } from 'n8n-workflow';
 
 import { nodeProperties } from './nodeProperties';
-import { makeApiRequest, CopilotResponse } from '../GitHubCopilotChatAPI/utils';
+import { makeApiRequest, CopilotResponse, getImageMimeType } from '../GitHubCopilotChatAPI/utils';
 import { GITHUB_COPILOT_API } from '../../shared/utils/GitHubCopilotEndpoints';
 import { loadAvailableModels, loadAvailableVisionModels } from '../../shared/models/DynamicModelLoader';
 import { GitHubCopilotModelsManager } from '../../shared/models/GitHubCopilotModels';
@@ -145,10 +145,137 @@ export class GitHubCopilotOpenAI implements INodeType {
 								content: msg.content as string,
 							};
 
-							// Add type if provided and valid (for file attachments)
-							if (msg.type && (msg.type === 'text' || msg.type === 'image_url')) {
+							// Handle file upload if type is 'file'
+							// Use default text type if not specified
+							const msgType = (msg.type as string) || 'text';
+
+							if (msgType === 'file_binary') {
+								const binaryKeyData = items[i].binary;
+								// Use binaryPropertyName from parameters or default to 'data'
+								const keyToUse = (msg.binaryPropertyName as string) || 'data';
+
+								if (binaryKeyData && binaryKeyData[keyToUse]) {
+									try {
+										const binaryData = binaryKeyData[keyToUse];
+										let mimeType = binaryData.mimeType || 'application/octet-stream';
+
+										// Read buffer safely
+										const buffer = await this.helpers.getBinaryDataBuffer(i, keyToUse);
+										
+										// Validate/Fix Mime Type for Vision API
+										// OpenAI expects strict image/* mime types in data URLs
+										if (!mimeType.startsWith('image/')) {
+											// Try to detect from buffer
+											const detected = getImageMimeType(buffer);
+											if (detected !== 'application/octet-stream') {
+												mimeType = detected;
+											} else {
+												// Default fallback for vision (often works for jpg/png even if not detected)
+												// We don't block other types here as per user request, allowing the API to validate
+												// If it's a PDF, we'll let it pass and let Copilot throw the 400 if it wants
+												console.warn(`⚠️ Could not detect image type for '${keyToUse}', defaulting to 'image/jpeg' or keeping original '${mimeType}'`);
+												
+												// If original was octet-stream, try image/jpeg to give it a chance
+												if (mimeType === 'application/octet-stream') {
+													mimeType = 'image/jpeg';
+												}
+											}
+										}
+										
+										// Force Schema Compliance for Data URL
+										// The API Schema Validator requires 'data:image/...' prefix.
+										// If we send 'data:application/pdf...', it fails SCHEMA validation (Generic 400).
+										// To get the DETAILED validation (e.g. "Unsupported image type"), we must lie to the schema.
+										if (!mimeType.startsWith('image/')) {
+											console.warn(`⚠️ Forcing mime type '${mimeType}' to 'image/jpeg' to bypass schema validation (allowing backend to validate content)`);
+											mimeType = 'image/jpeg';
+										}
+										
+										const base64 = buffer.toString('base64');
+										const dataUrl = `data:${mimeType};base64,${base64}`;
+
+										// Transform message to OpenAI vision format
+										// Initialize content array
+										const contentArray: any[] = [];
+										
+										// Use caption if available, otherwise fallback to check content (though it's hidden in UI for file_binary)
+										const caption = msg.caption as string;
+										
+										// Add text content if present (as a prompt for the image)
+										if (caption && caption.trim() !== '') {
+											contentArray.push({
+												type: 'text',
+												text: caption,
+											});
+										} else if (message.content && message.content.trim() !== '' && message.content !== '[object Object]') {
+											// Fallback for backward compatibility or direct usage, but ignore default binary object string
+											contentArray.push({
+												type: 'text',
+												text: message.content,
+											});
+										}
+
+										// Add image content
+										contentArray.push({
+											type: 'image_url',
+											image_url: {
+												url: dataUrl,
+												detail: 'auto',
+											},
+										});
+
+										message.role = 'user'; // Vision requires role to be 'user'
+										message.content = contentArray;
+										// Ensure no root-level type property
+										delete message.type; 
+
+										console.log(`📎 Attached binary file '${keyToUse}' (${mimeType}) as image_url`);
+									} catch (err) {
+										// Rethrow NodeOperationErrors directly
+										if (err instanceof NodeOperationError) {
+											throw err;
+										}
+										console.error(`❌ Failed to read binary data for '${keyToUse}':`, err);
+										// Include original error details for better debugging
+										const errorMessage = err instanceof Error ? err.message : String(err);
+										throw new NodeOperationError(
+											this.getNode(),
+											`Failed to read binary file '${keyToUse}': ${errorMessage}`,
+											{ itemIndex: i },
+										);
+									}
+								} else {
+									const available = binaryKeyData ? Object.keys(binaryKeyData).join(', ') : 'none';
+									throw new NodeOperationError(
+										this.getNode(),
+										`Binary property '${keyToUse}' not found. Available binary properties: ${available}`,
+										{ itemIndex: i },
+									);
+								}
+							}
+							
+							// Add type if provided and valid (for all messages), but NOT if already set (like image_url in binary mode)
+							// However, for OpenAI Chat Completions, 'type' property on the message object itself is NOT standard.
+							// It's only used inside content array.
+							// The legacy logic below sets message.type based on UI selection, which might be confusing the API
+							// if it expects standard OpenAI format.
+							
+							// Handle legacy file type (URL/Base64 passed manually in content)
+							else if (msgType === 'file') {
+								// Legacy: type='file' is NOT standard OpenAI, but maybe Copilot supported it?
+								// We'll keep it for backward compatibility if it worked before.
+								message.type = 'file';
+							}
+							
+							// Remove this block that sets 'type' on the root message object!
+							// Messages in OpenAI Chat API (and likely Copilot) should NOT have a 'type' field at the root level.
+							// The type is determined by the role and content structure.
+							// Setting message.type = 'text' or message.type = 'image_url' is invalid.
+							/*
+							else if (msg.type && (msg.type === 'text' || msg.type === 'image_url')) {
 								message.type = msg.type;
 							}
+							*/
 
 							messages.push(message);
 						}
@@ -498,12 +625,24 @@ export class GitHubCopilotOpenAI implements INodeType {
 				console.log('  Request body:', JSON.stringify(requestBody, null, 2));
 
 				// Make API request to GitHub Copilot
-				const response: CopilotResponse = await makeApiRequest(
-					this,
-					GITHUB_COPILOT_API.ENDPOINTS.CHAT_COMPLETIONS,
-					requestBody,
-					hasVisionContent, // Pass vision flag for proper headers
-				);
+				let response: CopilotResponse;
+				try {
+					response = await makeApiRequest(
+						this,
+						GITHUB_COPILOT_API.ENDPOINTS.CHAT_COMPLETIONS,
+						requestBody,
+						hasVisionContent, // Pass vision flag for proper headers
+					);
+				} catch (error) {
+					// Enhance error message with model info
+					const errorMsg = error instanceof Error ? error.message : String(error);
+					const enhancedError = new NodeOperationError(
+						this.getNode(),
+						`${errorMsg}\n\n🤖 Model used: ${copilotModel}`
+					);
+					// Preserve original check for NodeOperationError but wrap it to add info
+					throw enhancedError;
+				}
 
 				// Extract retry information from response metadata
 				const retriesUsed = response._retryMetadata?.retries || 0;

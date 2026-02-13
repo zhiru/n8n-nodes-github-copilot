@@ -2,6 +2,89 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.15] - 2026-02-13 🧠 Model Info in Errors
+
+### Improved
+- **GitHub Copilot OpenAI Node**: Added model information to error messages.
+  - Now, when an API error occurs (like 400 Bad Request), the error message explicitly states which model was being used (e.g., `🤖 Model used: gemini-2.0-flash`).
+  - This helps troubleshoot issues specific to certain models (like Gemini's stricter empty message validation).
+
+## [4.4.14] - 2026-02-13 🎭 Schema Bypass for Binary
+
+### Changed
+- **GitHub Copilot OpenAI Node**: Implemented schema validation bypass for non-image binary files.
+  - Forces the Data URL MIME status to `image/jpeg` when sending unknown files (like PDF).
+  - This allows the payload to pass the initial JSON Schema validation and reach the backend.
+  - Users will now receive the specific "Unsupported image" error from Copilot instead of a generic "Invalid request body" schema error.
+
+## [4.4.13] - 2026-02-13 🐛 Detailed Binary Errors
+
+### Improved
+- **GitHub Copilot OpenAI Node**: Enhanced error reporting for binary file reading failures.
+  - Now includes the specific system error message (e.g., file not found, permission denied) instead of a generic "Failed to read" error.
+  - Helps diagnose why n8n cannot read the binary attachment before sending it to Copilot.
+
+## [4.4.12] - 2026-02-13 🔓 Unrestricted Binary Uploads
+
+### Changed
+- **GitHub Copilot OpenAI Node**: Removed client-side validation for binary file types.
+  - Now allows ANY binary file (including PDF) to be sent to the API, allowing the GitHub Copilot API to return its own error messages if the format is unsupported.
+  - Improved error handling to surfacing specific read errors instead of masking them.
+
+## [4.4.11] - 2026-02-13 🚫 File Type Validation
+
+### Improved
+- **GitHub Copilot OpenAI Node**: Added strict validation for binary file types to prevent confusing API errors.
+  - Now explicitly blocks non-image files (like PDFs) with a clear error message explaining implementation limitations.
+  - Enforces strict whitelist: `png`, `jpeg`, `gif`, `webp`.
+
+## [4.4.10] - 2026-02-13 🐛 Vision API Role & Schema Fixes
+
+### Fixed
+- **GitHub Copilot OpenAI Node** - Critical fixes for Vision/Multimodal binary uploads:
+  - **Force User Role**: Automatically enforces `role: "user"` when attaching binary files (OpenAI/Copilot rejects system/assistant roles with images).
+  - **Schema Compliance**: Added `detail: "auto"` property to `image_url` object to satisfy strict schema validators.
+  - **Mime Type Detection**: Integrated robust MIME type detection to ensure valid `image/*` types are sent in Data URLs (fixes `400` errors for unknown binary types).
+  - **Clean Payload**: Explicitly removes any residual `type` properties from message objects before sending.
+
+## [4.4.9] - 2026-02-13 🐛 Schema Validation Fix
+
+### Fixed
+- **GitHub Copilot OpenAI Node** - Critical fix for API Schema Validation Error (400 Bad Request):
+  - Removed invalid `type` property from the root message object which was violating the OpenAI API spec.
+  - Resolved `invalid_request_body` error when sending multimodal messages (text + image).
+  - Ensures strict compliance with OpenAI Chat Completions API format ` { role: "user", content: [...] }`.
+
+## [4.4.8] - 2026-02-13 🎨 Enhanced UI for Binary Files
+
+### Improved
+- **GitHub Copilot OpenAI Node** - Improved user experience for file uploads:
+  - **Dynamic UI**: Hidden the main `Content` field when `File (Binary)` is selected to avoid confusion with `[object Object]` values.
+  - **New Caption Field**: Added a dedicated `Caption` field for image prompts when using binary mode.
+  - **Robust Handling**: Automatically ignores `[object Object]` strings if they accidentally slip into the content payload.
+  - **Error Prevention**: Fixes `400 Bad Request` errors caused by malformed text content in multimodal messages.
+
+## [4.4.7] - 2026-02-13 🔄 Legacy File Support & Binary Mode
+
+### Improved
+- **GitHub Copilot OpenAI Node** - Enhanced file attachment flexibility:
+  - **Restored Compatibility**: `File (URL / Base64)` option restored for manual image inputs (legacy behavior)
+  - **New Option**: `File (Binary)` explicitly separates binary file handling from text inputs
+  - **Conditional UI**: "Input Binary Field" only appears when `File (Binary)` is selected, keeping the UI clean
+  - **Multimodal Support**: Both modes support multimodal messages (text + image)
+
+### Fixed
+- Fixed regression where legacy file inputs were being treated as missing binary files
+
+## [4.4.6] - 2026-02-13 📎 Automatic Binary File Handling
+
+### Improved
+- **GitHub Copilot OpenAI Node** - Enhanced file attachment handling:
+  - **Automatic Binary Detection**: Now specifically asks for the "Input Binary Field" when "File" type is selected
+  - **Multimodal Support**: Supports sending both text content AND image attachment in a single message
+  - **Smart Defaults**: Defaults binary field name to 'data', preventing guessing errors
+  - **Better Validation**: Provides clear error messages if the specified binary property is not found
+
 ## [4.4.5] - 2026-02-10 🔄 JSON Restored & Vision Fixed
 
 ### Fixed
